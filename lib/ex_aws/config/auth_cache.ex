@@ -20,12 +20,22 @@ defmodule ExAws.Config.AuthCache do
   end
 
   def get(config) do
-    :ets.lookup(__MODULE__, @instance_auth_key)
+    :ets.lookup(ets_table(), @instance_auth_key)
     |> refresh_auth_if_required(config)
   end
 
+  def ets_table do
+    case :ets.whereis(__MODULE__) do
+      :undefined ->
+        :ets.new(__MODULE__, [:named_table, read_concurrency: true])
+
+      tid ->
+        tid
+    end
+  end
+
   def get(profile, expiration) do
-    case :ets.lookup(__MODULE__, {:awscli, profile}) do
+    case :ets.lookup(ets_table(), {:awscli, profile}) do
       [{{:awscli, ^profile}, auth_config}] ->
         auth_config
 
@@ -37,8 +47,7 @@ defmodule ExAws.Config.AuthCache do
   ## Callbacks
 
   def init(:ok) do
-    ets = :ets.new(__MODULE__, [:named_table, read_concurrency: true])
-    {:ok, ets}
+    {:ok, ets_table()}
   end
 
   def handle_call({:refresh_auth, config}, _from, ets) do
